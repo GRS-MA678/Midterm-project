@@ -6,7 +6,6 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-library(knitr)
 library(formatR)
 knitr::opts_chunk$set(echo = T, results = 'hide',tidy.opts=list(width.cutoff=70),tidy=TRUE)
 ```
@@ -52,10 +51,85 @@ top100[metal_rows, 3] <- "metal"
 top100$genre <- sub("^$", "other", top100$genre)
 ```
 
+##Visualizations
+```{r}
+#boxplot grouped by genre for popularity vs energy
+library(ggplot2)
+library(dplyr)
+genres <- sort(unique(top100$genre))
+genres <- c(genres[1:6], genres[8:10], genres[7])
+top100$genre <- factor(top100$genre, levels = genres)
+top100 %>%
+  ggplot(mapping=aes(x=nrgy, y=pop, fill=genre))+
+  geom_boxplot() +
+  scale_fill_discrete(breaks=genres) +
+  theme_bw()
+```
+
+```{r}
+#boxplot grouped by genre for positivity vs energy
+top100 %>%
+  ggplot(mapping=aes(x=val, y=pop, fill=genre))+
+  geom_boxplot() +
+  scale_fill_discrete(breaks=genres) +
+  theme_bw()
+```
+
+#Wordcloud
+```{r}
+library(wordcloud)
+subgenre_freq <- as.data.frame(table(top100$subgenre))
+names(subgenre_freq)[names(subgenre_freq) == "Var1"] <- "subgenre"
+
+set.seed(7)
+wordcloud(words = subgenre_freq$subgenre, freq = subgenre_freq$Freq,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(n=8, name="Accent"))
+#most common sub-genre is overwhelmingly dance pop, followed by pop
+
+subset <- subgenre_freq[order(-subgenre_freq$Freq),]
+
+barplot(subset[1:10,]$Freq, las = 2, names.arg = subset[1:10,]$subgenre,
+        col ="#1cd760", main ="Top10 Most Frequent Genres",
+        ylab = "Frequency")
+```
+
+
+##Fitting Multilevel Models
 ```{r}
 library(lme4)
 library(arm)
 attach(top100)
-M1 <- lmer(pop ~ nrgy + dnce + bpm + (1 | genre))
+#varying intercepts with popularity as response, group by genre
+M1_p_genre <- lmer(pop ~ nrgy + dnce + bpm + val + year.released + (1 | genre))
+coef(M1_p_genre)
+M2_p_genre <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + year.released + top.year + (1 | genre))
+M3_p_genre <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + 
+             top.year + year.released + artist.type + nrgy:dnce + 
+             (1 | genre))
+M4_p_genre <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + 
+             top.year + year.released + artist.type + nrgy:dnce + val:nrgy +
+             spch:dur + bpm:dnce + dB:nrgy +
+             (1 | genre))
+
+#check fit
+library(performance)
+model_performance(M1_p_genre)
+model_performance(M2_p_genre)
+model_performance(M3_p_genre)
+summary(M3_p_genre)
 ```
+
+```{r}
+#varying intercepts with popularity as response, group by year
+M1_p_year <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + genre + year.released + (1 | top.year))
+
+model_performance(M1_p_year)
+```
+
+```{r}
+#varying intercepts with genre as response
+# tmp <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + year.released + artist.type + (1 | top.year))
+```
+
 
