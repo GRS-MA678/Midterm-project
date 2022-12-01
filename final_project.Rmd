@@ -50,3 +50,10 @@ top100[metal_rows, 3] <- "metal"
 top100$genre <- sub("^$", "other", top100$genre)
 ```
 
+```{r}
+library(lme4)
+library(arm)
+attach(top100)
+M1 <- lmer(pop ~ nrgy + dnce + bpm + (1 | genre))
+```
+
