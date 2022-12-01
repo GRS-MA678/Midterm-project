@@ -6,7 +6,9 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = T, results = 'hide')
+library(knitr)
+library(formatR)
+knitr::opts_chunk$set(echo = T, results = 'hide',tidy.opts=list(width.cutoff=70),tidy=TRUE)
 ```
 
 ## R Markdown
