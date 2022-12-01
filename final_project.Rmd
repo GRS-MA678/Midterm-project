@@ -3,6 +3,7 @@ title: "midterm project"
 author: "Danya Zhang"
 date: "`r Sys.Date()`"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---
@@ -90,11 +91,17 @@ wordcloud(words = subgenre_freq$subgenre, freq = subgenre_freq$Freq,
           colors=brewer.pal(n=8, name="Accent"))
 #most common sub-genre is overwhelmingly dance pop, followed by pop
 
+#barplot for the most frequent genres in the top100 over all years
 subset <- subgenre_freq[order(-subgenre_freq$Freq),]
-
-barplot(subset[1:10,]$Freq, las = 2, names.arg = subset[1:10,]$subgenre,
-        col ="#1cd760", main ="Top10 Most Frequent Genres",
-        ylab = "Frequency")
+top10_genre <- subset[1:10,]
+top10_genre %>%
+ggplot(aes(reorder(subgenre, -Freq), Freq, fill=Freq)) + 
+  labs(title="Top10 Most Frequent Sub-genres") +
+  ylab("Frequency") +
+  xlab("subgenre") +
+  geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1)) +
+  scale_fill_gradient(low="#2F4858", high="#01CD7C")
 ```
 
 #popular artists
@@ -128,10 +135,10 @@ genre_freq_per_year_others <- rbind(top3_per_year, last_per_year) %>%
   rename(Year=top.year)
 
 #piedonut chart visualization
-library(webr)
-genre_freq_per_year_others %>%
-PieDonut(aes(Year, genre, count=Freq), #title = "Top Genres: 2010-2019",
-        showRatioThreshold = 0.015, donutLabelSize = 2.6, showRatioPie = FALSE, color="azure")
+# library(webr)
+# genre_freq_per_year_others %>%
+# PieDonut(aes(Year, genre, count=Freq), #title = "Top Genres: 2010-2019",
+#         showRatioThreshold = 0.015, donutLabelSize = 2.6, showRatioPie = FALSE, color="azure")
 ```
 
 The PieDonut chart above, which unfortunately does not knit to pdf, shows that pop and hip hop music dominated the charts in almost all years. The minimum threshold for displaying percentages was set to a relative frequency of 0.15. The interesting thing is that hip hop fell in the chart from 2011-2014 but made a resurgence 2015 and then again in 2017 and onward.
