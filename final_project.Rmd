@@ -4,19 +4,19 @@ author: "Danya Zhang"
 date: "`r Sys.Date()`"
 output:
   pdf_document: default
-  html_document:
-    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
 library(formatR)
-knitr::opts_chunk$set(echo = T, results = 'hide',tidy.opts=list(width.cutoff=70),tidy=TRUE)
+knitr::opts_chunk$set(echo = T, results = 'hide',tidy.opts=list(width.cutoff=70),tidy=TRUE,
+                      warning = FALSE)
 ```
 
 ## R Markdown
 # Reading in data
 ```{r}
-top100 <- read.csv("/Users/dz/Downloads/archive (1)/Spotify 2010 - 2019 Top 100.csv")
+setwd("/Users/dz/Documents/MSSP/GitHub/MA678 midterm project/Midterm-project")
+top100 <- read.csv("Spotify 2010 - 2019 Top 100.csv")
 top100 <- top100[-c(1001:1003),] #last 3 rows NA
 ```
 
@@ -76,6 +76,7 @@ top100 %>%
   geom_boxplot() +
   scale_fill_discrete(breaks=genres) +
   theme_bw()
+#boxplots demonstrate that certain characteristics could vary by genre and influnece popularity
 ```
 
 #Wordcloud
@@ -87,10 +88,13 @@ names(subgenre_freq)[names(subgenre_freq) == "Var1"] <- "subgenre"
 
 set.seed(7)
 wordcloud(words = subgenre_freq$subgenre, freq = subgenre_freq$Freq,
-          max.words=200, random.order=FALSE, rot.per=0.35, 
+          min.freq= 1, max.words=200, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(n=8, name="Accent"))
 #most common sub-genre is overwhelmingly dance pop, followed by pop
+```
 
+#barplot
+```{r}
 #barplot for the most frequent genres in the top100 over all years
 subset <- subgenre_freq[order(-subgenre_freq$Freq),]
 top10_genre <- subset[1:10,]
@@ -104,13 +108,12 @@ ggplot(aes(reorder(subgenre, -Freq), Freq, fill=Freq)) +
   scale_fill_gradient(low="#2F4858", high="#01CD7C")
 ```
 
-#popular artists
 
 #Popular genres for each year
 ```{r}
 #count genres for each year
 genre_freq_year <- top100 %>%
-  select(top.year, genre) %>%
+  dplyr::select(top.year, genre) %>%
   count(top.year, genre) %>%
   arrange(top.year, desc(n))
 
@@ -138,45 +141,63 @@ genre_freq_per_year_others <- rbind(top3_per_year, last_per_year) %>%
 # library(webr)
 # genre_freq_per_year_others %>%
 # PieDonut(aes(Year, genre, count=Freq), #title = "Top Genres: 2010-2019",
-#         showRatioThreshold = 0.015, donutLabelSize = 2.6, showRatioPie = FALSE, color="azure")
+#       showRatioThreshold = 0.015, donutLabelSize = 2.6, showRatioPie = FALSE, color="azure")
 ```
 
 The PieDonut chart above, which unfortunately does not knit to pdf, shows that pop and hip hop music dominated the charts in almost all years. The minimum threshold for displaying percentages was set to a relative frequency of 0.15. The interesting thing is that hip hop fell in the chart from 2011-2014 but made a resurgence 2015 and then again in 2017 and onward.
 
 ##Fitting Multilevel Models
 ```{r}
+attach(top100)
+top100$artist.type_ind <- ifelse(artist.type=="Duo", 2, ifelse(artist.type=="Solo", 1, ifelse(
+  artist.type=="Band/Group", 4, 3))) #make new indicator for artist.type
+subset_big <- top100[,c(3, 5,7:17, 19)]
+subset_big$year.released <- as.factor(subset_big$year.released)
+```
+
+#Varying intercepts without varying slopes
+```{r}
 library(lme4)
 library(arm)
-attach(top100)
 #varying intercepts with popularity as response, group by genre
-M1_p_genre <- lmer(pop ~ nrgy + dnce + bpm + val + year.released + (1 | genre))
+M1_p_genre <- lmer(pop ~ bpm + nrgy + dnce + val + year.released + (1 | genre), 
+                   data=subset_big)
 coef(M1_p_genre)
-M2_p_genre <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + year.released + top.year + (1 | genre))
-M3_p_genre <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + 
-             top.year + year.released + artist.type + nrgy:dnce + 
-             (1 | genre))
-M4_p_genre <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + 
-             top.year + year.released + artist.type + nrgy:dnce + val:nrgy +
-             spch:dur + bpm:dnce + dB:nrgy +
-             (1 | genre))
-
-#check fit
 library(performance)
 model_performance(M1_p_genre)
-model_performance(M2_p_genre)
-model_performance(M3_p_genre)
-summary(M3_p_genre)
+
+library(cAIC4)
+#stepwise
+full.model <- lm(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + 
+                   artist.type_ind + year.released, data=subset_big)
+gc <- c("genre", "artist.type_ind", "year.released")
+stepwise_M1 <- stepcAIC(full.model, groupCandidates=gc, 
+         data=subset_big, trace=TRUE, 
+         direction="forward", returnResult=TRUE)
+
+#compare models to delete excess predictors
+M1_mod1 <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch +  
+    artist.type_ind + year.released + (1 | artist.type_ind) + (1 | genre), data=subset_big)
+M1_mod2 <- lmer(pop ~ bpm + nrgy + dnce + val + acous + spch +  
+    artist.type_ind + year.released + (1 | artist.type_ind) + (1 | genre), data=subset_big)
+
+model_performance(M1_mod1)
+model_performance(M1_mod2)
+#difference in R2 (cond) is minimal so select second model
+M1_final <- lmer(pop ~  dnce + acous +  bpm + nrgy + nrgy:dnce + artist.type_ind + year.released + (1 | artist.type_ind) + (1 | genre), data=subset_big)
+model_performance(M1_final)
 ```
 
+#Varying intercepts and slopes
 ```{r}
-#varying intercepts with popularity as response, group by year
-M1_p_year <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + genre + year.released + (1 | top.year))
+attach(subset_big)
+sc <- c("bpm", "nrgy", "dnce", "acous")
+stepwise_M2 <- stepcAIC(M1_final, slopeCandidates = sc, 
+         data=subset_big, trace=TRUE, steps=100,
+         direction="forward", returnResult=TRUE)
 
-model_performance(M1_p_year)
-```
-
-```{r}
-#varying intercepts with genre as response
-# tmp <- lmer(pop ~ bpm + nrgy + dnce + dB + live + val + dur + acous + spch + year.released + artist.type + (1 | top.year))
+M2_final <- lmer(pop ~ dnce + acous + bpm + nrgy + artist.type_ind + year.released +  
+    (1 + dnce | artist.type_ind) + (1 + nrgy | genre) + dnce:nrgy, data=subset_big)
+model_performance(M2_final)
 ```
 
