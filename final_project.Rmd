@@ -190,14 +190,14 @@ model_performance(M1_final)
 
 #Varying intercepts and slopes
 ```{r}
-attach(subset_big)
-sc <- c("bpm", "nrgy", "dnce", "acous")
-stepwise_M2 <- stepcAIC(M1_final, slopeCandidates = sc, 
-         data=subset_big, trace=TRUE, steps=100,
+# attach(subset_big)
+sc <- c("bpm", "nrgy", "dnce")
+stepwise_M2 <- stepcAIC(M1_final, slopeCandidates = sc, data=subset_big, trace=TRUE,
          direction="forward", returnResult=TRUE)
 
 M2_final <- lmer(pop ~ dnce + acous + bpm + nrgy + artist.type_ind + year.released +  
     (1 + dnce | artist.type_ind) + (1 + nrgy | genre) + dnce:nrgy, data=subset_big)
-model_performance(M2_final)
+
+#
 ```
 
